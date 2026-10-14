@@ -37,7 +37,7 @@ type Config struct {
 	Instance      string `json:"instance"`
 }
 
-var IDs = []string{"postgres", "dragonfly", "vmetrics", "vlogs", "new-api", "cliproxy", "sing-box", "cloudflared", "api-entry"}
+var IDs = []string{"postgres", "dragonfly", "vmetrics", "vlogs", "new-api", "cliproxy", "sing-box", "cloudflared", "api-entry", "playwright", "lightpanda"}
 
 func Open(ctx context.Context, dir string) (*App, error) {
 	if _, e := os.Stat(filepath.Join(dir, "state.db")); e != nil {
@@ -65,7 +65,12 @@ func Open(ctx context.Context, dir string) (*App, error) {
 		s.Close()
 		return nil, e
 	}
-	return &App{Store: s, Engine: eng, Instance: cfg.Instance}, nil
+	a := &App{Store: s, Engine: eng, Instance: cfg.Instance}
+	if err := a.upgradeBrowserDefaults(ctx); err != nil {
+		a.Close()
+		return nil, err
+	}
+	return a, nil
 }
 func (a *App) Close() { _ = a.Engine.Close(); _ = a.Store.Close() }
 func Init(ctx context.Context, dir, kind, endpoint string) error {
@@ -91,7 +96,8 @@ func Init(ctx context.Context, dir, kind, endpoint string) error {
 		if (kind != "auto" && kind != old.Engine) || (endpoint != "" && endpoint != old.Endpoint) {
 			return errors.New("workspace already uses a different engine; choose a new state directory")
 		}
-		return nil
+		a := &App{Store: s, Instance: old.Instance}
+		return a.ensureBrowserDefaults(ctx)
 	}
 	if !errors.Is(e, state.ErrNotFound) {
 		return e

@@ -67,6 +67,8 @@ export const labels: Record<string, string> = {
   "sing-box": "sing-box",
   cloudflared: "Cloudflared",
   "api-entry": "API 入口",
+  playwright: "Playwright Server",
+  lightpanda: "Lightpanda",
 };
 
 export type Run = (fn: () => Promise<unknown>) => Promise<any>;

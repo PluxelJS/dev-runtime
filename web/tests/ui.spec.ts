@@ -60,6 +60,18 @@ test("dashboard navigation, CLI-shared configuration and node validation", async
   ).toBeVisible();
   await expect(page.getByRole("navigation", { name: "主导航" })).toBeVisible();
   await expect(page.getByRole("grid", { name: "服务概览" })).toBeVisible();
+  for (const name of ["Playwright Server", "Lightpanda"]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    await expect(
+      page.getByRole("navigation", { name: `${name} 页面目录` }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "编辑配置", exact: true }).click();
+    await expect(page.getByLabel("镜像", { exact: true })).toHaveValue(
+      name === "Lightpanda"
+        ? "docker.io/lightpanda/browser:1.0.0"
+        : "mcr.microsoft.com/playwright:v1.64.0-noble",
+    );
+  }
   await page.getByLabel("筛选服务").fill("proxy");
   await expect(
     page.getByRole("button", { name: "CLIProxyAPI", exact: true }),
