@@ -120,5 +120,5 @@ http {
 		s.User = user
 		r.User = user
 	}
-	return []state.Service{p, d, m, l, n, c, s, t, r}, nil
+	return append([]state.Service{p, d, m, l, n, c, s, t, r}, browserDefaults()...), nil
 }

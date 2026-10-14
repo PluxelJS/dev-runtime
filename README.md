@@ -45,6 +45,8 @@ dev-runtime --state-dir /absolute/path/runtime serve --listen 127.0.0.1:18318
 | VictoriaMetrics / VictoriaLogs | 生命周期、参数、持久化、HTTP 检查 | 8428 / 9428 |
 | New API | 生命周期、参数、独立 SQLite 数据 | 23000 |
 | CLIProxyAPI | 生命周期、节点出站切换、实际请求诊断、原管理页入口 | 8317 |
+| Playwright Server | Chromium / Firefox / WebKit 远程测试，Playwright 协议 | 3000 |
+| Lightpanda | 轻量 DOM 自动化，CDP 协议 | 9222 |
 | sing-box | 节点保存/切换、配置校验 | 仅容器网络 |
 | Cloudflared / API 入口 | 可选 tunnel；入口只代理 `/v1/` 与 `/v1beta/` | 仅容器网络 |
 
@@ -83,6 +85,65 @@ argv 是 JSON 字符串数组，直接交给引擎，不经 shell。镜像的 EN
 也可以 `services args set dragonfly --file args.json --revision 1`。常用表单与 argv 编辑的是相同数据。`memlock` 可通过完整服务 JSON 设置，默认沿用引擎限制以兼容 rootless 模式。
 
 `services enable` 启动并纳入下次 daemon 的 autostart；`disable` 停止并取消 autostart。`start/stop` 是本次运行操作。`pull` 拉取镜像并更新待应用修订号，再 `config apply` 替换容器；镜像拉取失败不停止旧容器。替换时保留数据卷，但变更数据挂载目标或数据库大版本仍需要自行评估。
+
+### 浏览器自动化
+
+`playwright` 和 `lightpanda` 在侧栏统一归入「浏览器自动化」，默认关闭，只发布到宿主机 loopback。升级后执行任意打开工作区的命令或 `init` 会补齐缺少的浏览器预设；已有服务配置、修订号、秘密和文件保持原样。
+
+```bash
+dev-runtime services start playwright
+dev-runtime diagnose playwright
+dev-runtime services start lightpanda
+dev-runtime diagnose lightpanda
+# 需要随 daemon 启动时用 services enable；临时使用完用 services stop。
+```
+
+**Playwright Server** 使用官方 `mcr.microsoft.com/playwright:v1.64.0-noble`，容器内运行配套的 `playwright@1.64.0 run-server`。官方镜像带浏览器，但不带 npm 包，因此首次启动和容器重建需要访问 npm registry。项目使用相同版本（协议要求主/次版本匹配）；修改镜像版本时同时修改 argv 中的 npm 版本。
+
+```bash
+# 在测试项目中配置配套版本后运行：
+PW_TEST_CONNECT_WS_ENDPOINT=ws://127.0.0.1:3000/ npx playwright test
+```
+
+库方式连接：
+
+```js
+import { chromium } from 'playwright';
+const browser = await chromium.connect('ws://127.0.0.1:3000/', {
+  exposeNetwork: '<loopback>',
+});
+try {
+  const page = await browser.newPage();
+  // exposeNetwork 让容器浏览器可访问客户端所在机器的 loopback 服务。
+  await page.goto('http://127.0.0.1:5173');
+  await page.screenshot({ path: 'homepage.png' });
+} finally {
+  await browser.close();
+}
+```
+
+Playwright Test 可在配置中使用 `use.connectOptions: { wsEndpoint: 'ws://127.0.0.1:3000/', exposeNetwork: '<loopback>' }` 获得相同行为。浏览器在容器内运行，默认的 `localhost` 指向容器；同一工作区内服务也可通过服务名和容器端口访问。
+
+**Lightpanda** 使用 `docker.io/lightpanda/browser:1.0.0`，关闭遥测，通过 CDP 连接：
+
+```js
+import { chromium } from 'playwright';
+const browser = await chromium.connectOverCDP('ws://127.0.0.1:9222');
+try {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.goto('https://example.com');
+  console.log(await page.title());
+} finally {
+  await browser.close();
+}
+```
+
+Lightpanda 适合抓取与 DOM/JavaScript 自动化，不提供 Chromium 的视觉渲染能力，也不保证兼容全部 Playwright Test API；截图、布局和完整 E2E 使用 Playwright Server。Lightpanda 的 CDP 连接没有 `exposeNetwork`；访问宿主开发服务时，Podman 可使用 `host.containers.internal`，开发服务须监听可从容器访问的地址。Docker 使用宿主可达 IP，默认预设不添加 host-gateway 别名。
+
+诊断检查 Playwright HTTP 服务或 Lightpanda `/json/version` 是否就绪，不代表浏览器启动、页面加载或测试套件已经通过。端口可在配置页修改，客户端连接地址需同步调整。
+
+参考：[Playwright Docker](https://playwright.dev/docs/docker)、[远程连接与网络](https://playwright.dev/docs/api/class-browsertype#browser-type-connect)、[Lightpanda](https://github.com/lightpanda-io/browser)。
 
 ### PostgreSQL
 
@@ -156,7 +217,11 @@ make test
 make web                  # 修改前端后重建嵌入资源
 make ui-test              # 需要 Playwright Chromium；本机可指定 CHROMIUM_PATH
 make integration ENGINE=podman  # 或 docker：需要对应引擎 CLI/API，用于隔离测试与清理
+make browser-integration ENGINE=podman # 先 npm ci --prefix web；验证远程浏览器会话、宿主访问与截图
+# 仅测一个浏览器：DEV_RUNTIME_BROWSER=lightpanda make browser-integration ENGINE=podman
 ```
+
+可用 `PW_TEST_CONNECT_WS_ENDPOINT=ws://127.0.0.1:3000/ make ui-test` 让 Dashboard 测试通过远程 Playwright Server 运行；配置会把客户端 loopback 转发给浏览器。
 
 真实集成测试使用独立临时工作区、随机端口和带随机前缀的容器/卷，不接管现有服务。覆盖数据库权限/密码、备份恢复、重启持久化、各应用检查、参数应用及 CLIProxyAPI 经 sing-box 的出站选择。首次运行需要拉取镜像。默认测试不启动容器。
 

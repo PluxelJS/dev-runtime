@@ -18,6 +18,7 @@ cmd/dev-runtime
 ## 工作区与并发
 
 - `state.db` 存服务配置、修订号、秘密、节点、数据库登记、任务、备份目录索引。Goose 只负责此新数据库未来的 schema 版本，不承担旧部署迁移。
+- 工作区打开时按需补齐缺失的浏览器服务预设：先只读检查，确实缺少时持 mutation lock 再检查并写入。已有服务、秘密与配置文件不重建；完成升级后的读操作不等待 mutation lock。
 - 配置实体使用类型化 Go struct，以 JSON 文档存入简单 SQLite resources 表。当前查询仅按 kind/id，不引入 ORM 或手写复杂 SQL 生成层。
 - workspace mutation 文件锁同时约束 CLI 进程和 HTTP 工作线程；读操作不持有该锁。第一版串行执行变更，使容器与数据库操作的顺序清楚。
 - 写配置要求 revision 匹配；bundle 全部预检再一次事务提交，任一冲突不落入部分更新。

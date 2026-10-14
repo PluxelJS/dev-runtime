@@ -60,6 +60,18 @@ test("dashboard navigation, CLI-shared configuration and node validation", async
   ).toBeVisible();
   await expect(page.getByRole("navigation", { name: "主导航" })).toBeVisible();
   await expect(page.getByRole("grid", { name: "服务概览" })).toBeVisible();
+  for (const name of ["Playwright Server", "Lightpanda"]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    await expect(
+      page.getByRole("navigation", { name: `${name} 页面目录` }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "编辑配置", exact: true }).click();
+    await expect(page.getByLabel("镜像", { exact: true })).toHaveValue(
+      name === "Lightpanda"
+        ? "docker.io/lightpanda/browser:1.0.0"
+        : "mcr.microsoft.com/playwright:v1.64.0-noble",
+    );
+  }
   await page.getByLabel("筛选服务").fill("proxy");
   await expect(
     page.getByRole("button", { name: "CLIProxyAPI", exact: true }),
@@ -86,6 +98,9 @@ test("dashboard navigation, CLI-shared configuration and node validation", async
     "aria-current",
     "location",
   );
+  // Keep the target away from the document bottom across browser/font builds;
+  // reaching the bottom intentionally activates the last (configuration) section.
+  await page.setViewportSize({ width: 1440, height: 600 });
   await page.locator("#backups").evaluate((element) => {
     document.documentElement.style.scrollBehavior = "auto";
     const toolbarHeight =
@@ -101,6 +116,7 @@ test("dashboard navigation, CLI-shared configuration and node validation", async
     "location",
   );
   await expect(page.getByRole("heading", { name: "备份与恢复" })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("button", { name: "DragonflyDB", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "DragonflyDB：重启" }),

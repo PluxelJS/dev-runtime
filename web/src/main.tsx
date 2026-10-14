@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Alert } from "@heroui/react/alert";
 import { Button } from "@heroui/react/button";
@@ -41,6 +41,8 @@ import { PGPanel } from "./PGPanel";
 import { CLIProxyPanel, NodePanel } from "./ProxyPanel";
 import { ServiceEditor } from "./ServiceEditor";
 import { TextInputField } from "./Fields";
+
+const browserServices = new Set(["playwright", "lightpanda"]);
 
 type View = "overview" | "jobs" | "settings" | string;
 
@@ -604,16 +606,21 @@ function App() {
               <SearchField.ClearButton aria-label="清空筛选" />
             </SearchField.Group>
           </SearchField>
-          {visibleServices.map((id) => (
-            <ServiceNav
-              key={id}
-              id={id}
-              service={rows.find((service) => service.id === id)}
-              selected={view === id}
-              busy={busy}
-              onSelect={setView}
-              run={run}
-            />
+          {visibleServices.map((id, index) => (
+            <Fragment key={id}>
+              {browserServices.has(id) &&
+                !browserServices.has(visibleServices[index - 1]) && (
+                  <span className="nav-heading">浏览器自动化</span>
+                )}
+              <ServiceNav
+                id={id}
+                service={rows.find((service) => service.id === id)}
+                selected={view === id}
+                busy={busy}
+                onSelect={setView}
+                run={run}
+              />
+            </Fragment>
           ))}
         </nav>
         <div className="sidebar-summary">

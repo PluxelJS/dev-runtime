@@ -235,3 +235,70 @@ func TestEngineIntegration(t *testing.T) {
 	}
 	t.Log("real engine lifecycle, PostgreSQL credentials/permissions/persistence, service probes passed")
 }
+
+// Run separately from database integration; browser images are large. Set
+// DEV_RUNTIME_BROWSER=lightpanda or playwright to exercise just one preset.
+func TestBrowserEngineIntegration(t *testing.T) {
+	kind := os.Getenv("DEV_RUNTIME_INTEGRATION")
+	if kind == "" {
+		t.Skip("set DEV_RUNTIME_INTEGRATION=podman or docker")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	dir := t.TempDir()
+	if err := Init(ctx, dir, kind, os.Getenv("DEV_RUNTIME_TEST_ENDPOINT")); err != nil {
+		t.Fatal(err)
+	}
+	a, err := Open(ctx, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	ids := []string{"playwright", "lightpanda"}
+	if id := os.Getenv("DEV_RUNTIME_BROWSER"); id != "" {
+		if id != "playwright" && id != "lightpanda" {
+			t.Fatal("unknown browser", id)
+		}
+		ids = []string{id}
+	}
+	defer func() {
+		clean, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		for _, id := range ids {
+			_ = a.stop(clean, id)
+			_ = a.Engine.Remove(clean, a.Name(id))
+		}
+		_ = exec.CommandContext(clean, kind, "network", "rm", a.Name("default")).Run()
+	}()
+	for _, id := range ids {
+		t.Run(id, func(t *testing.T) {
+			s, err := a.Service(ctx, id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.Ports[0].Published = freePort(t)
+			if err = a.Save(ctx, s); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = a.Lifecycle(ctx, "start", id, 2); err != nil {
+				t.Fatal(err)
+			}
+			deadline := time.Now().Add(2 * time.Minute)
+			for {
+				d, err := a.Diagnose(ctx, id)
+				if err == nil && d.OK {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatalf("readiness: %+v %v", d, err)
+				}
+				time.Sleep(time.Second)
+			}
+			endpoint := fmt.Sprintf("ws://127.0.0.1:%d", s.Ports[0].Published)
+			output, err := exec.CommandContext(ctx, "node", "../../web/scripts/browser-smoke.mjs", id, endpoint).CombinedOutput()
+			if err != nil {
+				t.Fatalf("browser session: %v\n%s", err, output)
+			}
+		})
+	}
+}

@@ -257,7 +257,7 @@ func (a *App) Diagnose(ctx context.Context, id string) (Diagnosis, error) {
 		var output bytes.Buffer
 		e = a.Engine.Exec(ctx, a.Name(id), []string{"sing-box", "check", "-c", "/etc/sing-box/config.json"}, nil, &output)
 		result.Scope = "configuration validity only; use CLIProxyAPI diagnosis for outbound connectivity"
-	case "vmetrics", "vlogs", "new-api":
+	case "vmetrics", "vlogs", "new-api", "playwright", "lightpanda":
 		s, err := a.Service(ctx, id)
 		if err != nil {
 			return result, err
@@ -268,6 +268,14 @@ func (a *App) Diagnose(ctx context.Context, id string) (Diagnosis, error) {
 		path := "/health"
 		if id == "new-api" {
 			path = "/api/status"
+		}
+		if id == "playwright" {
+			path = "/"
+			result.Scope = "Playwright server HTTP readiness; browser sessions are not tested"
+		}
+		if id == "lightpanda" {
+			path = "/json/version"
+			result.Scope = "CDP discovery readiness; browser sessions are not tested"
 		}
 		req, _ := http.NewRequestWithContext(ctx, "GET", "http://"+net.JoinHostPort(s.Ports[0].Host, fmt.Sprint(s.Ports[0].Published))+path, nil)
 		res, err := HTTPClient().Do(req)
