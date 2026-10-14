@@ -98,6 +98,9 @@ test("dashboard navigation, CLI-shared configuration and node validation", async
     "aria-current",
     "location",
   );
+  // Keep the target away from the document bottom across browser/font builds;
+  // reaching the bottom intentionally activates the last (configuration) section.
+  await page.setViewportSize({ width: 1440, height: 600 });
   await page.locator("#backups").evaluate((element) => {
     document.documentElement.style.scrollBehavior = "auto";
     const toolbarHeight =
@@ -113,6 +116,7 @@ test("dashboard navigation, CLI-shared configuration and node validation", async
     "location",
   );
   await expect(page.getByRole("heading", { name: "备份与恢复" })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("button", { name: "DragonflyDB", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "DragonflyDB：重启" }),

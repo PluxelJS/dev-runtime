@@ -22,6 +22,7 @@ jobs:
         working-directory: web
       - run: make ui-test
       - run: make integration ENGINE=docker
+      - run: make browser-integration ENGINE=docker
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -88,7 +88,7 @@ argv 是 JSON 字符串数组，直接交给引擎，不经 shell。镜像的 EN
 
 ### 浏览器自动化
 
-`playwright` 和 `lightpanda` 默认关闭，只发布到宿主机 loopback。升级后执行任意打开工作区的命令或 `init` 会补齐缺少的浏览器预设；已有服务配置、修订号、秘密和文件保持原样。
+`playwright` 和 `lightpanda` 在侧栏统一归入「浏览器自动化」，默认关闭，只发布到宿主机 loopback。升级后执行任意打开工作区的命令或 `init` 会补齐缺少的浏览器预设；已有服务配置、修订号、秘密和文件保持原样。
 
 ```bash
 dev-runtime services start playwright
@@ -217,9 +217,11 @@ make test
 make web                  # 修改前端后重建嵌入资源
 make ui-test              # 需要 Playwright Chromium；本机可指定 CHROMIUM_PATH
 make integration ENGINE=podman  # 或 docker：需要对应引擎 CLI/API，用于隔离测试与清理
-make browser-integration ENGINE=podman # 先 npm ci --prefix web；验证远程浏览器会话
+make browser-integration ENGINE=podman # 先 npm ci --prefix web；验证远程浏览器会话、宿主访问与截图
 # 仅测一个浏览器：DEV_RUNTIME_BROWSER=lightpanda make browser-integration ENGINE=podman
 ```
+
+可用 `PW_TEST_CONNECT_WS_ENDPOINT=ws://127.0.0.1:3000/ make ui-test` 让 Dashboard 测试通过远程 Playwright Server 运行；配置会把客户端 loopback 转发给浏览器。
 
 真实集成测试使用独立临时工作区、随机端口和带随机前缀的容器/卷，不接管现有服务。覆盖数据库权限/密码、备份恢复、重启持久化、各应用检查、参数应用及 CLIProxyAPI 经 sing-box 的出站选择。首次运行需要拉取镜像。默认测试不启动容器。
 
