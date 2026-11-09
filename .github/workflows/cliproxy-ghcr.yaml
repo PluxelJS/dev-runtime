@@ -75,6 +75,10 @@ jobs:
             type=raw,value=${{ steps.upstream.outputs.version }}
             type=raw,value=upstream-${{ steps.upstream.outputs.short }}
             type=sha,prefix=integration-
+          labels: |
+            org.opencontainers.image.version=${{ steps.upstream.outputs.version }}
+            io.pluxeljs.upstream.source=https://github.com/router-for-me/CLIProxyAPI
+            io.pluxeljs.upstream.revision=${{ steps.upstream.outputs.commit }}
 
       - name: Build and push (amd64)
         uses: docker/build-push-action@v6

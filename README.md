@@ -229,7 +229,11 @@ Nix 可用 `nix build`；Home Manager 导入 `homeManagerModules.default`，配�
 
 具体分层、故障语义与开发约束见 [架构说明](docs/architecture.md)。
 
-### CLIProxyAPI 源码镜像
+### 本仓库的 API 源码镜像
+
+新工作区默认使用本仓库工作流发布的 `ghcr.io/pluxeljs/cliproxyapi:latest` 和 `ghcr.io/pluxeljs/new-api:latest`，不再拉取这两个服务的官方成品镜像，也不会在拉取失败时回退到官方镜像。两者目前仅构建 linux/amd64；其他架构需要手动配置兼容镜像。版本标签或 digest 可在服务配置中固定；工作流发布新的 `latest` 不会自动拉取或重启已有容器。
+
+#### CLIProxyAPI
 
 `.github/workflows/cliproxy-ghcr.yaml` 每天 UTC 19:17（北京时间次日 03:17）解析上游最新稳定版，并从对应提交源码仅构建 linux/amd64 镜像。也支持手动触发。发布到 `ghcr.io/pluxeljs/cliproxyapi`，提供 `latest`、`vX.Y.Z`、`upstream-<commit>` 标签。构建使用该版本上游原始 Dockerfile，并执行官方的模型目录刷新脚本；保留官方 CGO 编译参数、基础镜像和入口。无需 QEMU 或多架构 manifest 合并。启用 Go 缓存及独立的 `cliproxyapi-amd64` 镜像层缓存；管理页面由 CLIProxyAPI 的官方更新机制获取。
 
@@ -243,4 +247,21 @@ podman build --platform linux/amd64 --build-arg VERSION=v8.0.20 \
   -t localhost/pluxeljs/cliproxyapi:v8.0.20 .
 ```
 
-已有工作区的服务配置不会被仓库默认值覆盖。将 CLIProxyAPI 服务的镜像地址保存为所需标签后，使用 `dev-runtime services pull cliproxy` 拉取，再用 `dev-runtime config apply cliproxy` 应用；同一标签的镜像更新需要 `dev-runtime services restart cliproxy` 重建容器。升级前备份配置与账号目录。管理页面要求 v8 时，应升级后端到 v8 或更高版本。
+#### New API
+
+`.github/workflows/new-api-ghcr.yaml` 每天 UTC 19:37（北京时间次日 03:37）读取 `QuantumNous/new-api` 的 Latest Release，检出对应源码，并按照上游发布流程写入 `VERSION`，使用该版本原始 Dockerfile 构建前端与后端。上游的 Latest Release 可能带 `rc` 后缀，此工作流跟随上游选择，不将其称为稳定版。发布到 `ghcr.io/pluxeljs/new-api`，提供 `latest`、上游版本、`upstream-<commit>` 和 `integration-<commit>` 标签，使用独立的 `new-api-amd64` 镜像层缓存。
+
+手动触发时可填写 `version`（例如 `v0.13.2`）以构建指定版本；指定版本不会覆盖 `latest`。留空则跟随 Latest Release，仅在默认分支更新 `latest`。首次发布后需要确保 GHCR 包可公开拉取，再启用对应默认镜像。
+
+#### 切换已有工作区
+
+已有工作区的服务配置不会被仓库默认值覆盖。在 Dashboard 的服务配置中，将 CLIProxyAPI 的镜像改为 `ghcr.io/pluxeljs/cliproxyapi:latest`，将 New API 改为 `ghcr.io/pluxeljs/new-api:latest`，保存后分别执行：
+
+```bash
+dev-runtime services pull cliproxy
+dev-runtime config apply cliproxy
+dev-runtime services pull new-api
+dev-runtime config apply new-api
+```
+
+旧的 `ghcr.io/pluxeljs/proxy-llm-api:latest` 地址也需要改为 `ghcr.io/pluxeljs/cliproxyapi:latest`。同一标签的镜像更新需要先 `services pull`，再 `services restart` 重建容器。升级前备份配置、账号目录和 New API 数据库；如只切换镜像来源，可先手动构建当前使用的版本，再保存对应的 GHCR 版本标签。管理页面要求 v8 时，应升级 CLIProxyAPI 后端到 v8 或更高版本。

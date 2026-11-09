@@ -96,11 +96,11 @@ http {
 	l := base("vlogs", "docker.io/victoriametrics/victoria-logs:v1.52.0", 9428)
 	l.Args = []string{"-storageDataPath=/storage", "-retentionPeriod=7d", "-httpListenAddr=:9428"}
 	l.Mounts = []state.Mount{volume("vlogs", "/storage")}
-	n := base("new-api", "docker.io/calciumion/new-api:v0.13.2", 23000)
+	n := base("new-api", "ghcr.io/pluxeljs/new-api:latest", 23000)
 	n.Ports[0].Target = 3000
 	n.Env = map[string]string{"TZ": "Asia/Taipei", "SESSION_SECRET": session, "SQLITE_PATH": "/data/new-api.db", "ERROR_LOG_ENABLED": "true", "GIN_MODE": "release"}
 	n.Mounts = []state.Mount{bind("new-api", "/data", false)}
-	c := base("cliproxy", "docker.io/eceasy/cli-proxy-api:latest", 8317)
+	c := base("cliproxy", "ghcr.io/pluxeljs/cliproxyapi:latest", 8317)
 	c.Args = []string{"./CLIProxyAPI", "-config", "/data/config/config.yaml"}
 	c.Env = map[string]string{"TZ": "Asia/Taipei", "MANAGEMENT_PASSWORD": key}
 	c.Mounts = []state.Mount{bind("cliproxy/settings", "/data/config", false), bind("cliproxy/auth", "/data/auth", false), bind("cliproxy/logs", "/CLIProxyAPI/logs", false)}
